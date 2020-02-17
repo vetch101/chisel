@@ -3,6 +3,7 @@ package chserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -23,30 +24,34 @@ import (
 
 // Config is the configuration for the chisel service
 type Config struct {
-	KeySeed       string
-	AuthFile      string
-	Auth          string
-	Proxy         string
-	UpstreamProxy string
-	Socks5        bool
-	Reverse       bool
+	KeySeed           string
+	AuthFile          string
+	Auth              string
+	Proxy             string
+	UpstreamProxy     string
+	Socks5            bool
+	Reverse           bool
+	TLSCertFile       string
+	TLSPrivateKeyFile string
 }
 
 // Server respresent a chisel service
 type Server struct {
 	*chshare.Logger
-	connStats        chshare.ConnStats
-	fingerprint      string
-	httpServer       *chshare.HTTPServer
-	reverseProxy     *httputil.ReverseProxy
-	upstreamProxyUrl *url.URL
-	upstreamDial     chshare.FnDial
-	sessCount        int32
-	sessions         *chshare.Users
-	socksServer      *socks5.Server
-	sshConfig        *ssh.ServerConfig
-	users            *chshare.UserIndex
-	reverseOk        bool
+	connStats         chshare.ConnStats
+	fingerprint       string
+	httpServer        *chshare.HTTPServer
+	reverseProxy      *httputil.ReverseProxy
+	upstreamProxyUrl  *url.URL
+	upstreamDial      chshare.FnDial
+	sessCount         int32
+	sessions          *chshare.Users
+	socksServer       *socks5.Server
+	sshConfig         *ssh.ServerConfig
+	users             *chshare.UserIndex
+	reverseOk         bool
+	tlsCertFile       string
+	tlsPrivateKeyFile string
 }
 
 var upgrader = websocket.Upgrader{
@@ -156,6 +161,16 @@ func NewServer(config *Config) (*Server, error) {
 	if config.Reverse {
 		s.Infof("Reverse tunnelling enabled")
 	}
+
+	switch {
+	case config.TLSCertFile == "" && config.TLSPrivateKeyFile == "":
+	case config.TLSCertFile != "" && config.TLSPrivateKeyFile != "":
+		s.tlsCertFile = config.TLSCertFile
+		s.tlsPrivateKeyFile = config.TLSPrivateKeyFile
+	default:
+		return nil, fmt.Errorf(`both --tls-cert-file and --tls-key-file must be set`)
+	}
+
 	return s, nil
 }
 
@@ -185,7 +200,12 @@ func (s *Server) Start(host, port string) error {
 	if s.Debug {
 		h = requestlog.Wrap(h)
 	}
-	return s.httpServer.GoListenAndServe(host+":"+port, h)
+	addr := host + ":" + port
+	if s.tlsCertFile != "" {
+		return s.httpServer.GoListenAndServeTLS(addr, h, s.tlsCertFile, s.tlsPrivateKeyFile)
+	}
+
+	return s.httpServer.GoListenAndServe(addr, h)
 }
 
 // Wait waits for the http server to close

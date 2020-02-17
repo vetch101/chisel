@@ -3,8 +3,10 @@ package chclient
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
@@ -24,6 +26,7 @@ type Config struct {
 	shared              *chshare.Config
 	Fingerprint         string
 	Auth                string
+	CAFile              string
 	KeepAlive           time.Duration
 	MaxRetryCount       int
 	MaxRetryInterval    time.Duration
@@ -41,6 +44,7 @@ type Client struct {
 	sshConfig   *ssh.ClientConfig
 	sshConn     ssh.Conn
 	proxyURL    *url.URL
+	tlsConfig   *tls.Config
 	server      string
 	running     bool
 	runningc    chan error
@@ -116,6 +120,24 @@ func NewClient(config *Config) (*Client, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if config.CAFile != "" {
+		if u.Scheme != "https" && u.Scheme != "wss" {
+			return nil, fmt.Errorf(`must use "https" or "wss" when using "--ca-file"`)
+		}
+
+		data, err := ioutil.ReadFile(config.CAFile)
+		if err != nil {
+			return nil, fmt.Errorf("could not read certificate authority: %s", err)
+		}
+
+		certPool := x509.NewCertPool()
+		if !certPool.AppendCertsFromPEM(data) {
+			return nil, fmt.Errorf("could not append certificate data")
+		}
+
+		client.tlsConfig = &tls.Config{RootCAs: certPool}
 	}
 
 	return client, nil
@@ -207,6 +229,7 @@ func (c *Client) connectionLoop() {
 			ReadBufferSize:   65536,
 			WriteBufferSize:  65536,
 			HandshakeTimeout: 45 * time.Second,
+			TLSClientConfig:  c.tlsConfig,
 			Subprotocols:     []string{chshare.ProtocolVersion},
 		}
 		//optionally proxy
