@@ -12,9 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/armon/go-socks5"
 	"github.com/gorilla/websocket"
 	"github.com/jpillora/backoff"
-	"github.com/jpillora/chisel/share"
+	chshare "github.com/jpillora/chisel/share"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -36,14 +37,15 @@ type Config struct {
 //Client represents a client instance
 type Client struct {
 	*chshare.Logger
-	config    *Config
-	sshConfig *ssh.ClientConfig
-	sshConn   ssh.Conn
-	proxyURL  *url.URL
-	server    string
-	running   bool
-	runningc  chan error
-	connStats chshare.ConnStats
+	config      *Config
+	sshConfig   *ssh.ClientConfig
+	sshConn     ssh.Conn
+	proxyURL    *url.URL
+	server      string
+	running     bool
+	runningc    chan error
+	connStats   chshare.ConnStats
+	socksServer *socks5.Server
 }
 
 //NewClient creates a new client instance
@@ -70,10 +72,14 @@ func NewClient(config *Config) (*Client, error) {
 	//swap to websockets scheme
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1)
 	shared := &chshare.Config{}
+	createSocksServer := false
 	for _, s := range config.Remotes {
 		r, err := chshare.DecodeRemote(s)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to decode remote '%s': %s", s, err)
+		}
+		if r.Socks && r.Reverse {
+			createSocksServer = true
 		}
 		shared.Remotes = append(shared.Remotes, r)
 	}
@@ -102,6 +108,14 @@ func NewClient(config *Config) (*Client, error) {
 		ClientVersion:   "SSH-" + chshare.ProtocolVersion + "-client",
 		HostKeyCallback: client.verifyServer,
 		Timeout:         30 * time.Second,
+	}
+
+	if createSocksServer {
+		socksConfig := &socks5.Config{}
+		client.socksServer, err = socks5.New(socksConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return client, nil
@@ -294,6 +308,12 @@ func (c *Client) Close() error {
 func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 	for ch := range chans {
 		remote := string(ch.ExtraData())
+		socks := remote == "socks"
+		if socks && c.socksServer == nil {
+			c.Debugf("Denied socks request, please enable client socks remote.")
+			ch.Reject(ssh.Prohibited, "SOCKS5 is not enabled on the client")
+			continue
+		}
 		stream, reqs, err := ch.Accept()
 		if err != nil {
 			c.Debugf("Failed to accept stream: %s", err)
@@ -301,6 +321,11 @@ func (c *Client) connectStreams(chans <-chan ssh.NewChannel) {
 		}
 		go ssh.DiscardRequests(reqs)
 		l := c.Logger.Fork("conn#%d", c.connStats.New())
-		go chshare.HandleTCPStream(l, &c.connStats, stream, remote, net.Dial)
+		if socks {
+			go chshare.HandleSocksStream(l, c.socksServer, &c.connStats, stream)
+		} else {
+			go chshare.HandleTCPStream(l, &c.connStats, stream, remote, net.Dial)
+		}
+
 	}
 }
