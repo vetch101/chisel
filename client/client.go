@@ -204,8 +204,8 @@ func (c *Client) connectionLoop() {
 			chshare.SleepSignal(d)
 		}
 		d := websocket.Dialer{
-			ReadBufferSize:   1024,
-			WriteBufferSize:  1024,
+			ReadBufferSize:   65536,
+			WriteBufferSize:  65536,
 			HandshakeTimeout: 45 * time.Second,
 			Subprotocols:     []string{chshare.ProtocolVersion},
 		}
