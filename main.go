@@ -120,6 +120,15 @@ var serverHelp = `
     access, in the form of <user:pass>. This is equivalent to creating an
     authfile with {"<user:pass>": [""]}.
 
+    --ciphers, An optional list of comma separated values to enforce specific
+    ciphers. For example, aes128-ctr,aes192-ctr,aes256-ctr
+
+    --kex, An optional list of comma separated values to enforce specific key
+    exchanges. For example, curve25519-sha256@libssh.org
+
+    --macs, An optional ist of comma separated values to enforce specific
+    MACs. For example, hmac-sha2-256
+
     --tls-cert-file, An optional file containing the default x509 Certificate
     for HTTPS. (CA cert, if any, concatenated after server cert).
 
@@ -153,6 +162,9 @@ func server(args []string) {
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
 	auth := flags.String("auth", "", "")
+	ciphers := flags.String("ciphers", "", "")
+	kex := flags.String("kex", "", "")
+	macs := flags.String("macs", "", "")
 	tlsCertFile := flags.String("tls-cert-file", "", "")
 	tlsPrivateKeyFile := flags.String("tls-key-file", "", "")
 	proxy := flags.String("proxy", "", "")
@@ -190,6 +202,9 @@ func server(args []string) {
 		KeySeed:           *key,
 		AuthFile:          *authfile,
 		Auth:              *auth,
+		Ciphers:           *ciphers,
+		Kex:               *kex,
+		Macs:              *macs,
 		TLSCertFile:       *tlsCertFile,
 		TLSPrivateKeyFile: *tlsPrivateKeyFile,
 		Proxy:             *proxy,
@@ -274,6 +289,15 @@ var clientHelp = `
     chisel server. Only valid when connecting to the server with
     "https" or "wss".
 
+    --ciphers, An optional list of comma separated values to enforce specific
+    ciphers. For example, aes128-ctr,aes192-ctr,aes256-ctr
+
+    --kex, An optional list of comma separated values to enforce specific key
+    exchanges. For example, curve25519-sha256@libssh.org
+
+    --macs, An optional ist of comma separated values to enforce specific
+    MACs. For example, hmac-sha2-256
+
     --keepalive, An optional keepalive interval. Since the underlying
     transport is HTTP, in many instances we'll be traversing through
     proxies, often these proxies will close idle connections. You must
@@ -311,6 +335,9 @@ func client(args []string) {
 	fingerprint := flags.String("fingerprint", "", "")
 	auth := flags.String("auth", "", "")
 	caFile := flags.String("ca-file", "", "")
+	ciphers := flags.String("ciphers", "", "")
+	kex := flags.String("kex", "", "")
+	macs := flags.String("macs", "", "")
 	keepalive := flags.Duration("keepalive", 0, "")
 	maxRetryCount := flags.Int("max-retry-count", -1, "")
 	maxRetryInterval := flags.Duration("max-retry-interval", 0, "")
@@ -336,6 +363,9 @@ func client(args []string) {
 		Fingerprint:         *fingerprint,
 		Auth:                *auth,
 		CAFile:              *caFile,
+		Ciphers:             *ciphers,
+		Kex:                 *kex,
+		Macs:                *macs,
 		KeepAlive:           *keepalive,
 		MaxRetryCount:       *maxRetryCount,
 		MaxRetryInterval:    *maxRetryInterval,

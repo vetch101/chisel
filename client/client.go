@@ -27,6 +27,9 @@ type Config struct {
 	Fingerprint         string
 	Auth                string
 	CAFile              string
+	Ciphers             string
+	Kex                 string
+	Macs                string
 	KeepAlive           time.Duration
 	MaxRetryCount       int
 	MaxRetryInterval    time.Duration
@@ -122,6 +125,31 @@ func NewClient(config *Config) (*Client, error) {
 		}
 	}
 
+	if config.Ciphers != "" {
+		var ciphers []string
+		for _, cipher := range strings.Split(config.Ciphers, ",") {
+			ciphers = append(ciphers, cipher)
+		}
+		client.sshConfig.Ciphers = ciphers
+		client.Infof("Ciphers %s", client.sshConfig.Ciphers)
+	}
+
+	if config.Kex != "" {
+		var kex []string
+		for _, k := range strings.Split(config.Kex, ",") {
+			kex = append(kex, k)
+		}
+		client.sshConfig.KeyExchanges = kex
+		client.Infof("KeyExchanges %s", client.sshConfig.KeyExchanges)
+	}
+	if config.Macs != "" {
+		var macs []string
+		for _, m := range strings.Split(config.Macs, ",") {
+			macs = append(macs, m)
+		}
+		client.sshConfig.MACs = macs
+		client.Infof("MACs %s", client.sshConfig.MACs)
+	}
 	if config.CAFile != "" {
 		if u.Scheme != "https" && u.Scheme != "wss" {
 			return nil, fmt.Errorf(`must use "https" or "wss" when using "--ca-file"`)

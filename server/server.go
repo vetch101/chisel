@@ -27,6 +27,9 @@ type Config struct {
 	KeySeed           string
 	AuthFile          string
 	Auth              string
+	Ciphers           string
+	Kex               string
+	Macs              string
 	Proxy             string
 	UpstreamProxy     string
 	Socks5            bool
@@ -95,6 +98,30 @@ func NewServer(config *Config) (*Server, error) {
 	s.sshConfig = &ssh.ServerConfig{
 		ServerVersion:    "SSH-" + chshare.ProtocolVersion + "-server",
 		PasswordCallback: s.authUser,
+	}
+	if config.Ciphers != "" {
+		var ciphers []string
+		for _, cipher := range strings.Split(config.Ciphers, ",") {
+			ciphers = append(ciphers, cipher)
+		}
+		s.sshConfig.Ciphers = ciphers
+		s.Infof("Ciphers %s", s.sshConfig.Ciphers)
+	}
+	if config.Kex != "" {
+		var kex []string
+		for _, k := range strings.Split(config.Kex, ",") {
+			kex = append(kex, k)
+		}
+		s.sshConfig.KeyExchanges = kex
+		s.Infof("KeyExchanges %s", s.sshConfig.KeyExchanges)
+	}
+	if config.Macs != "" {
+		var macs []string
+		for _, m := range strings.Split(config.Macs, ",") {
+			macs = append(macs, m)
+		}
+		s.sshConfig.MACs = macs
+		s.Infof("MACs %s", s.sshConfig.MACs)
 	}
 	s.sshConfig.AddHostKey(private)
 	//setup reverse proxy
