@@ -129,6 +129,10 @@ var serverHelp = `
     --macs, An optional ist of comma separated values to enforce specific
     MACs. For example, hmac-sha2-256
 
+    --keytype, An optional choice of ECDSA or rsa key type; default is ECDSA.
+
+    --keysize, An optional key size; must be >2048 - only applies to rsa.
+
     --tls-cert-file, An optional file containing the default x509 Certificate
     for HTTPS. (CA cert, if any, concatenated after server cert).
 
@@ -162,6 +166,8 @@ func server(args []string) {
 	key := flags.String("key", "", "")
 	authfile := flags.String("authfile", "", "")
 	auth := flags.String("auth", "", "")
+	keyType := flags.String("keytype", "", "")
+	keySize := flags.String("keysize", "", "")
 	ciphers := flags.String("ciphers", "", "")
 	kex := flags.String("kex", "", "")
 	macs := flags.String("macs", "", "")
@@ -202,6 +208,8 @@ func server(args []string) {
 		KeySeed:           *key,
 		AuthFile:          *authfile,
 		Auth:              *auth,
+		KeyType:           *keyType,
+		KeySize:           *keySize,
 		Ciphers:           *ciphers,
 		Kex:               *kex,
 		Macs:              *macs,

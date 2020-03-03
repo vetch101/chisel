@@ -27,6 +27,8 @@ type Config struct {
 	KeySeed           string
 	AuthFile          string
 	Auth              string
+	KeyType           string
+	KeySize           string
 	Ciphers           string
 	Kex               string
 	Macs              string
@@ -85,8 +87,14 @@ func NewServer(config *Config) (*Server, error) {
 			s.users.AddUser(u)
 		}
 	}
-	//generate private key (optionally using seed)
-	key, _ := chshare.GenerateKey(config.KeySeed)
+	if config.KeyType != "" {
+		s.Infof("KeyType %s", config.KeyType)
+	}
+	if config.KeySize != "" {
+		s.Infof("KeySize %s", config.KeySize)
+	}
+	//generate private key (optionally using seed, keytype & keysize)
+	key, _ := chshare.GenerateKey(config.KeySeed, config.KeyType, config.KeySize)
 	//convert into ssh.PrivateKey
 	private, err := ssh.ParsePrivateKey(key)
 	if err != nil {

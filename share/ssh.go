@@ -5,11 +5,13 @@ import (
 	"crypto/elliptic"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
 
 	"github.com/armon/go-socks5"
@@ -17,22 +19,44 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-func GenerateKey(seed string) ([]byte, error) {
+func GenerateKey(seed, keyType, keySize string) ([]byte, error) {
 	var r io.Reader
 	if seed == "" {
 		r = rand.Reader
 	} else {
 		r = NewDetermRand([]byte(seed))
 	}
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
-	if err != nil {
-		return nil, err
+	if keyType == "" || keyType == "ECDSA" {
+		priv, err := ecdsa.GenerateKey(elliptic.P256(), r)
+		if err != nil {
+			return nil, err
+		}
+		b, err := x509.MarshalECPrivateKey(priv)
+		if err != nil {
+			return nil, fmt.Errorf("Unable to marshal ECDSA private key: %v", err)
+		}
+
+		return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: b}), nil
+
+	} else if keyType == "rsa" {
+		var size int
+		if keySize != "" {
+			size, _ = strconv.Atoi(keySize)
+			if size < 2048 {
+				return nil, fmt.Errorf("RSA keysize too small")
+			}
+		} else {
+			size = 4096
+		}
+		priv, err := rsa.GenerateKey(r, size)
+		if err != nil {
+			return nil, err
+		}
+		b := x509.MarshalPKCS1PrivateKey(priv)
+		return pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: b}), nil
 	}
-	b, err := x509.MarshalECPrivateKey(priv)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to marshal ECDSA private key: %v", err)
-	}
-	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: b}), nil
+
+	return nil, nil
 }
 
 func FingerprintKey(k ssh.PublicKey) string {
